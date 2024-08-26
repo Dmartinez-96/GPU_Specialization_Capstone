@@ -37,7 +37,7 @@ An optional script used to run your executable code, either with or without comm
 
 ## Key Concepts
 
-Performance Strategies, Image Processing, NPP Library
+Performance Strategies, Signal Processing, NPP Library
 
 ## Supported SM Architectures
 
