@@ -1,4 +1,4 @@
-# Image Rotation using NVIDIA NPP with CUDA
+# PCA of Instrumental Sound Data using NVIDIA NPP with CUDA
 
 ## Overview
 
@@ -16,7 +16,12 @@ This folder should hold all example data in any format. If the original data is 
 Any libraries that are not installed via the Operating System-specific package manager should be placed here, so that it is easier for inclusion/linking.
 
 ```src/```
-The source code should be placed here in a hierarchical fashion, as appropriate.
+The source code is here, with programs split according to function.
+
+    - ```feature_extraction.cu``` This file handles extracting various features from the WAV files, such as spectral centroid, flatness, bandwidth, zero-crossing rate (ZCR), energy, and temporal features using CUDA and NPP signal processing routines. Logic maps the filenames to instrument labels based on substrings, saving extracted and calculated features and corresponding instrument labels to a CSV.
+    - ```pca.cu```
+    - ```wav_loader.cu```
+
 
 ```README.md```
 This file should hold the description of the project so that anyone cloning or deciding if they want to clone this repository can understand its purpose to help with their decision.

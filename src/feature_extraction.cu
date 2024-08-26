@@ -1,9 +1,10 @@
 #include <npp.h>
 #include <cuda_runtime.h>
 #include <iostream>
-// Comment out if not testing
-#include <cmath>
-#define PI 3.14159265358979323846
+#include <vector>
+#include <filesystem>
+#include <map>
+#include <algorithm>
 
 // Constants
 const int SIGNAL_LENGTH = 1024; // Can be adjusted based on input signal
@@ -23,6 +24,13 @@ struct Features {
     float temporal_skewness;        // Temporal Skewness
     float temporal_variance;        // Temporal Variance
 };
+
+// Convert string to lowercase
+std::string toLowerCase(const std::string& str) {
+    std::string lowerStr = str;
+    std::transform(lowerStr.begin(), lowerStr.end(), lowerStr.begin(), ::tolower);
+    return lowerStr;
+}
 
 __global__ void scaleSignal(float* d_signal, float scale) {
     /*
@@ -77,7 +85,7 @@ __global__ void calculateZCR(float* d_signal, int length, float* d_zcr) {
 }
 
 
-void fft_feature_extraction(float* h_signal, int length, float* h_features) {
+void fft_feature_extraction(float* h_signal, int length, Features* h_features) {
     /*
     Documentation:
         Extracts features from the input signal by performing a Fast Fourier Transform (FFT) and calculating the magnitude of the FFT result. This process is accelerated using Nvidia Performance Primitives (NPP) and CUDA.
@@ -203,35 +211,90 @@ void fft_feature_extraction(float* h_signal, int length, float* h_features) {
 }
 
 int main() {
-    // Testing code:
-    /////////////////////////////
-    // float h_signal[SIGNAL_LENGTH];
-    // float frequency = 440.0f; // A4 note, 440 Hz
-    // float sampleRate = 44100.f; // Standard 44.1 kHz audio sample rate.
-    // // Generate a sine wave
-    // for (int i = 0; i < SIGNAL_LENGTH; ++i) {
-    //     h_signal[i] = sinf(2.0f * PI * frequency * i / sampleRate);
-    // }
-    ///////////////////////////////
-    float h_signal[SIGNAL_LENGTH] = {/* Fill with sample signal data */};
-    Features h_features = {};
+    std::vector<std::string> wavFiles;
+    std::map<std::string, std::string> fileToInstrumentMap;
 
-    // Perform feature extraction
-    fft_feature_extraction(h_signal, SIGNAL_LENGTH, &h_features);
-
-    // Print out the magnitude and other features.
-    for (int i = 0; i < SIGNAL_LENGTH; ++i) {
-        std::cout << "Magnitude[" << i << "]: " << h_features.magnitude[i] << std::endl;
+    // Populate the wavFiles vector and fileToInstrumentMap based on filenames in data/WAV_files
+    for (const auto& entry : std::filesystem::directory_iterator("data/WAV_files")) {
+        if (entry.path().extension() == ".wav") {
+            std::string filePath = entry.path().string();
+            wavFiles.push_back(filePath);
+            
+            std::string lowerFilePath = toLowerCase(filePath);
+            // Map each filename to an instrument label
+            if (lowerFilePath.find("guitar") != std::string::npos || lowerFilePath.find("gtr") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "guitar";
+            } else if (lowerFilePath.find("piano") != std::string::npos || lowerFilePath.find("pno") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "piano";
+            } else if (lowerFilePath.find("violin") != std::string::npos || lowerFilePath.find("vln") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "violin";
+            } else if (lowerFilePath.find("cello") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "cello";
+            } else if (lowerFilePath.find("harpsichord") != std::string::npos || lowerFilePath.find("harpsi") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "harpsichord";
+            } else if (lowerFilePath.find("gongs") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "gongs";
+            } else if (lowerFilePath.find("bass") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "bass";
+            } else if (lowerFilePath.find("marimba") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "marimba";
+            } else if (lowerFilePath.find("oboe") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "oboe";
+            } else if (lowerFilePath.find("shakuhachi") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "shakuhachi";
+            } else if (lowerFilePath.find("sitar") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "sitar";
+            } else if (lowerFilePath.find("flute") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "flute";
+            } else if (lowerFilePath.find("sax") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "saxophone";
+            } else if (lowerFilePath.find("trumpet") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "trumpet";
+            } else if (lowerFilePath.find("viola") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "viola";
+            }
+        }
     }
-    std::cout << "Spectral Centroid: " << h_features.spectral_centroid << std::endl;
-    std::cout << "Spectral Bandwidth: " << h_features.spectral_bandwidth << std::endl;
-    std::cout << "Spectral Flatness: " << h_features.spectral_flatness << std::endl;
-    std::cout << "Zero Crossing Rate: " << h_features.zcr << std::endl;
-    std::cout << "Energy: " << h_features.energy << std::endl;
-    std::cout << "Temporal Mean: " << h_features.temporal_mean << std::endl;
-    std::cout << "Temporal Variance: " << h_features.temporal_variance << std::endl;
-    std::cout << "Temporal Skewness: " << h_features.temporal_skewness << std::endl;
-    std::cout << "Temporal Kurtosis: " << h_features.temporal_kurtosis << std::endl;
+
+    // Process each WAV file, extract features, and associate with instrument label
+    std::vector<std::vector<float>> featuresMatrix;
+    std::vector<std::string> labels;
+
+    for (const auto& file : wavFiles) {
+        float h_signal[SIGNAL_LENGTH];
+        loadWavFileAquila(file.c_str(), h_signal, SIGNAL_LENGTH);
+
+        Features h_features;
+        fft_feature_extraction(h_signal, SIGNAL_LENGTH, &h_features);
+
+        // Store extracted features
+        std::vector<float> features_row = {
+            h_features.spectralCentroid,
+            h_features.spectralFlatness,
+            h_features.spectralBandwidth,
+            h_features.zcr,
+            h_features.energy,
+            h_features.temporal_mean,
+            h_features.temporal_variance,
+            h_features.temporal_skewness,
+            h_features.temporal_kurtosis
+        };
+        featuresMatrix.push_back(features_row);
+
+        // Store the corresponding instrument label
+        labels.push_back(fileToInstrumentMap[file]);
+    }
+
+    // Optionally write the features and labels to a CSV file
+    std::ofstream outFile("features_with_labels.csv");
+    for (size_t i = 0; i < featuresMatrix.size(); ++i) {
+        for (size_t j = 0; j < featuresMatrix[i].size(); ++j) {
+            outFile << featuresMatrix[i][j];
+            if (j < featuresMatrix[i].size() - 1) outFile << ",";
+        }
+        outFile << "," << labels[i] << "\n";
+    }
+    outFile.close();
 
     return 0;
 }
