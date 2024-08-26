@@ -18,9 +18,9 @@ Any libraries that are not installed via the Operating System-specific package m
 ```src/```
 The source code is here, with programs split according to function.
 
-    - ```feature_extraction.cu``` This file handles extracting various features from the WAV files, such as spectral centroid, flatness, bandwidth, zero-crossing rate (ZCR), energy, and temporal features using CUDA and NPP signal processing routines. Logic maps the filenames to instrument labels based on substrings, saving extracted and calculated features and corresponding instrument labels to a CSV.
-    - ```pca.cu```
-    - ```wav_loader.cu```
+    - ```wav_loader.cu``` This file loads WAV files using the Aquila library, extracts the signal, and passes it to the feature_extraction function. The extracted features are stored in a matrix and written to a CSV.
+    - ```feature_extraction.cu``` This file handles extracting various features from the WAV files, such as spectral centroid, flatness, bandwidth, zero-crossing rate (ZCR), energy, and temporal features using CUDA and NPP signal processing routines. Logic maps the filenames to instrument labels based on substrings, saving extracted and calculated features and corresponding instrument labels to another CSV.
+    - ```pca.cu``` This file loads the feature matrix from the CSV file and uses NPP features to compute the covariance matrix, perform eigenvalue decomposition, and project the data onto the principal components. The results are then saved to a third CSV.
 
 
 ```README.md```
