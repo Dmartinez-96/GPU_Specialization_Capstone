@@ -1,6 +1,5 @@
 ################################################################################
 # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
-#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -12,7 +11,6 @@
 #  * Neither the name of NVIDIA CORPORATION nor the names of its
 #    contributors may be used to endorse or promote products derived
 #    from this software without specific prior written permission.
-#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
 # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -24,40 +22,42 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
 ################################################################################
 #
-# Makefile project only supported on Mac OS X and Linux Platforms)
+# Makefile project only supported on Mac OS X and Linux Platforms
 #
 ################################################################################
 
 # Define the compiler and flags
 NVCC = /usr/local/cuda/bin/nvcc
 CXX = g++
-CXXFLAGS = -std=c++11 -I/usr/local/cuda/include -Iinclude
-LDFLAGS = -L/usr/local/cuda/lib64 -lcudart -lnppc -lnppicc -lnppig
+CXXFLAGS = -std=c++17 -I/usr/local/cuda/include -Iinclude -I/usr/local/include
+LDFLAGS = -L/usr/local/cuda/lib64 -L/usr/local/lib -lcudart -lnppc -lnppicc -lnppig -lcufft /usr/local/lib/libAquila.a
 
 # Define directories
 SRC_DIR = src
+PROC_DIR = $(SRC_DIR)/proc
+VIS_DIR = $(SRC_DIR)/vis
 BIN_DIR = bin
 DATA_DIR = data
 LIB_DIR = lib
 
 # Define source files and target executable
-SRC = $(SRC_DIR)/main.cu $(SRC_DIR)/feature_extraction.cu $(SRC_DIR)/classification.cpp
-TARGET = $(BIN_DIR)/signalClassificationNPP
+PROC_SRC = $(PROC_DIR)/wav_loader.cu $(PROC_DIR)/feature_extraction.cu $(PROC_DIR)/pca.cu
+MAIN_SRC = $(SRC_DIR)/main.cu
+TARGET = $(BIN_DIR)/signalPCA_NPP.exe
 
 # Define the default rule
 all: $(TARGET)
 
 # Rule for building the target executable
-$(TARGET): $(SRC)
+$(TARGET): $(PROC_SRC) $(MAIN_SRC)
 	mkdir -p $(BIN_DIR)
-	$(NVCC) $(CXXFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+	$(NVCC) $(CXXFLAGS) $(PROC_SRC) $(MAIN_SRC) -o $(TARGET) $(LDFLAGS)
 
 # Rule for running the application
 run: $(TARGET)
-	./$(TARGET) --input $(DATA_DIR)/sample.wav --output $(DATA_DIR)/classification_result.txt
+	./$(TARGET) --input $(DATA_DIR)/WAV_files --output $(DATA_DIR)/pca_result.txt
 
 # Clean up
 clean:

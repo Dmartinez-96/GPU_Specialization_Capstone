@@ -4,12 +4,12 @@
 #include <sstream>
 #include <cuda_runtime.h>
 #include <npp.h>
+#include "../../include/pca.h"
 
 #define NUM_FEATURES 9  // Adjust based on the number of features you are using
 
 // Utility function to load the feature matrix from a CSV file
-void loadFeatureMatrix(const char* filename, std::vector<std::vector<float>>& featuresMatrix) {
-    /*
+/*
     Description:
         This function loads a feature matrix from a CSV file into a 2D vector. 
         Each row of the CSV corresponds to a row in the feature matrix, and 
@@ -29,7 +29,8 @@ void loadFeatureMatrix(const char* filename, std::vector<std::vector<float>>& fe
         void, no return:
             - The function loads the feature matrix into the provided vector, 
               modifying it directly. No return value is needed.
-    */
+*/
+void loadFeatureMatrix(const char* filename, std::vector<std::vector<float>>& featuresMatrix) {
     std::ifstream file(filename);
     std::string line;
 
@@ -47,8 +48,7 @@ void loadFeatureMatrix(const char* filename, std::vector<std::vector<float>>& fe
 }
 
 // Compute the covariance matrix using NPP
-void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatrix, std::vector<std::vector<float>>& covarianceMatrix) {
-    /*
+/*
     Description:
         This function computes the covariance matrix of a given feature matrix. 
         The feature matrix is first centered by subtracting the mean of each feature, 
@@ -71,7 +71,8 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         void, no return:
             - The function directly modifies the provided covariance matrix vector 
               with computed values. No return value is needed.
-    */
+*/
+void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatrix, std::vector<std::vector<float>>& covarianceMatrix) {
     int num_samples = featuresMatrix.size();
     int num_features = featuresMatrix[0].size();
 
@@ -93,11 +94,20 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
 
     // Convert centeredMatrix to a single array for NPP
     float* d_centeredMatrix;
-    cudaMalloc((void**)&d_centeredMatrix, num_samples * num_features * sizeof(float));
+    cudaError_t err = cudaMalloc((void**)&d_centeredMatrix, num_samples * num_features * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        return;
+    }
     cudaMemcpy(d_centeredMatrix, &centeredMatrix[0][0], num_samples * num_features * sizeof(float), cudaMemcpyHostToDevice);
 
     float* d_covarianceMatrix;
-    cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
+    cudaError_t err = cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_centeredMatrix);
+        return;
+    }
 
     // NPP function to compute covariance matrix (this is a pseudocode placeholder)
     // Replace with the appropriate NPP function if available
@@ -111,8 +121,7 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
 }
 
 // Perform eigenvalue decomposition using NPP
-void performEigenDecomposition(const std::vector<std::vector<float>>& covarianceMatrix, std::vector<float>& eigenvalues, std::vector<std::vector<float>>& eigenvectors) {
-    /*
+/*
     Description:
         This function performs eigenvalue decomposition on a covariance matrix.
         It calculates the eigenvalues and corresponding eigenvectors, which are 
@@ -138,17 +147,33 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
         void, no return:
             - The function modifies the `eigenvalues` and `eigenvectors` vectors 
               directly. No return value is needed.
-    */
+*/
+void performEigenDecomposition(const std::vector<std::vector<float>>& covarianceMatrix, std::vector<float>& eigenvalues, std::vector<std::vector<float>>& eigenvectors) {
     int num_features = covarianceMatrix.size();
 
     float* d_covarianceMatrix;
-    cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
+    cudaError_t err = cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        return;
+    }
     cudaMemcpy(d_covarianceMatrix, &covarianceMatrix[0][0], num_features * num_features * sizeof(float), cudaMemcpyHostToDevice);
 
     float* d_eigenvalues;
     float* d_eigenvectors;
-    cudaMalloc((void**)&d_eigenvalues, num_features * sizeof(float));
-    cudaMalloc((void**)&d_eigenvectors, num_features * num_features * sizeof(float));
+    cudaError_t err = cudaMalloc((void**)&d_eigenvalues, num_features * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_covarianceMatrix);
+        return;
+    }
+    cudaError_t err = cudaMalloc((void**)&d_eigenvectors, num_features * num_features * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        return;
+    }
 
     // NPP function to compute eigenvalues and eigenvectors (pseudocode placeholder)
     // nppiEigenValuesVectors_32f(d_covarianceMatrix, d_eigenvalues, d_eigenvectors, num_features);
@@ -163,8 +188,7 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
 }
 
 // Project the data onto the principal components
-void projectOntoPrincipalComponents(const std::vector<std::vector<float>>& featuresMatrix, const std::vector<std::vector<float>>& eigenvectors, std::vector<std::vector<float>>& pca_result) {
-    /*
+/*
     Description:
         This function projects the original feature matrix onto the principal 
         components determined by the eigenvectors. The result is a new matrix 
@@ -191,7 +215,8 @@ void projectOntoPrincipalComponents(const std::vector<std::vector<float>>& featu
         void, no return:
             - The function directly modifies the `pca_result` vector with the 
               projection of the data onto the principal components. No return value is needed.
-    */
+*/
+void projectOntoPrincipalComponents(const std::vector<std::vector<float>>& featuresMatrix, const std::vector<std::vector<float>>& eigenvectors, std::vector<std::vector<float>>& pca_result) {
     int num_samples = featuresMatrix.size();
     int num_components = eigenvectors.size();
 
@@ -203,37 +228,4 @@ void projectOntoPrincipalComponents(const std::vector<std::vector<float>>& featu
             }
         }
     }
-}
-
-int main() {
-    std::vector<std::vector<float>> featuresMatrix;
-    loadFeatureMatrix("features.csv", featuresMatrix);
-
-    int num_samples = featuresMatrix.size();
-    int num_features = featuresMatrix[0].size();
-
-    // Initialize covariance matrix and perform PCA
-    std::vector<std::vector<float>> covarianceMatrix(num_features, std::vector<float>(num_features, 0));
-    computeCovarianceMatrix(featuresMatrix, covarianceMatrix);
-
-    std::vector<float> eigenvalues(num_features, 0);
-    std::vector<std::vector<float>> eigenvectors(num_features, std::vector<float>(num_features, 0));
-    performEigenDecomposition(covarianceMatrix, eigenvalues, eigenvectors);
-
-    // Project the data onto the principal components
-    std::vector<std::vector<float>> pca_result(num_samples, std::vector<float>(num_features));
-    projectOntoPrincipalComponents(featuresMatrix, eigenvectors, pca_result);
-
-    // Write PCA results to a new CSV file
-    std::ofstream outFile("pca_results.csv");
-    for (const auto& row : pca_result) {
-        for (size_t i = 0; i < row.size(); ++i) {
-            outFile << row[i];
-            if (i < row.size() - 1) outFile << ",";
-        }
-        outFile << "\n";
-    }
-    outFile.close();
-
-    return 0;
 }

@@ -1,0 +1,70 @@
+For installation, the dependencies can be obtained as follows.
+
+For Ubuntu/Debian:
+    sudo apt-get update
+    sudo apt-get install cmake g++ libfftw3-dev libsndfile1-dev
+    git clone https://github.com/zsiciarz/aquila.git
+    cd aquila
+    mkdir build
+    cd build
+    cmake ..
+    make
+    // SYSTEM-WIDE INSTALLATION:
+        sudo make install
+    // LOCAL INSTALLATION:
+        cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/project/ ..
+        make
+        make install
+
+For Fedora:
+    sudo dnf install cmake gcc-c++ fftw-devel libsndfile-devel
+    git clone https://github.com/zsiciarz/aquila.git
+    cd aquila
+    mkdir build
+    cd build
+    cmake ..
+    make
+    // SYSTEM-WIDE INSTALLATION:
+        sudo make install
+    // LOCAL INSTALLATION:
+        cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/project/ ..
+        make
+        make install
+
+
+For macOS (using Homebrew):
+    brew install cmake fftw libsndfile
+    git clone https://github.com/zsiciarz/aquila.git
+    cd aquila
+    mkdir build
+    cd build
+    cmake ..
+    make
+    // SYSTEM-WIDE INSTALLATION:
+        sudo make install
+    // LOCAL INSTALLATION:
+        cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/project/ ..
+        make
+        make install
+
+
+For Windows:
+    git clone https://github.com/microsoft/vcpkg.git
+    cd vcpkg
+    bootstrap-vcpkg.bat
+    vcpkg install fftw3:x64-windows
+    vcpkg install libsndfile:x64-windows
+    vcpkg integrate install
+    git clone https://github.com/zsiciarz/aquila.git
+    cd aquila
+    mkdir build
+    cd build
+    cmake -DCMAKE_TOOLCHAIN_FILE=[path_to_vcpkg]/scripts/buildsystems/vcpkg.cmake ..
+
+Then, once all required installs have been done, the project can be built with:
+    make clean
+    make
+
+For the visualization Jupyter Notebook, you will need to run:
+    pip install notebook
+    cd src/vis
