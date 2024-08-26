@@ -31,8 +31,9 @@
 # Define the compiler and flags
 NVCC = /usr/local/cuda/bin/nvcc
 CXX = g++
-CXXFLAGS = -std=c++17 -I/usr/local/cuda/include -Iinclude -I/usr/local/include
-LDFLAGS = -L/usr/local/cuda/lib64 -L/usr/local/lib -lcudart -lnppc -lnppicc -lnppig -lcufft /usr/local/lib/libAquila.a
+CXXFLAGS = -std=c++17 -I/usr/local/cuda/include -Iinclude -I/usr/local/include -I./lib
+NVCCFLAGS = -arch=sm_75
+LDFLAGS = -L/usr/local/cuda/lib64 -L/usr/local/lib -lcudart -lnppc -lnppicc -lnppig -lcufft -lcusolver /usr/local/lib/libAquila.a
 
 # Define directories
 SRC_DIR = src
@@ -53,7 +54,7 @@ all: $(TARGET)
 # Rule for building the target executable
 $(TARGET): $(PROC_SRC) $(MAIN_SRC)
 	mkdir -p $(BIN_DIR)
-	$(NVCC) $(CXXFLAGS) $(PROC_SRC) $(MAIN_SRC) -o $(TARGET) $(LDFLAGS)
+	$(NVCC) $(CXXFLAGS) $(NVCCFLAGS) $(PROC_SRC) $(MAIN_SRC) -o $(TARGET) $(LDFLAGS)
 
 # Rule for running the application
 run: $(TARGET)
@@ -61,7 +62,7 @@ run: $(TARGET)
 
 # Clean up
 clean:
-	rm -rf $(BIN_DIR)/*
+	rm -rf $(BIN_DIR)/* *.csv || true
 
 # Installation rule (not much to install, but here for completeness)
 install:

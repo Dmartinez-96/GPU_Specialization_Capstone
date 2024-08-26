@@ -6,8 +6,6 @@
 #include "../include/feature_extraction.h"
 #include "../include/pca.h"
 
-// const int SIGNAL_LENGTH = 1024;
-
 int main() {
     std::vector<std::string> wavFiles;
     std::map<std::string, std::string> fileToInstrumentMap;

@@ -4,9 +4,8 @@
 #include <sstream>
 #include <cuda_runtime.h>
 #include <npp.h>
+#include <cusolverDn.h>
 #include "../../include/pca.h"
-
-#define NUM_FEATURES 9  // Adjust based on the number of features you are using
 
 // Utility function to load the feature matrix from a CSV file
 /*
@@ -38,16 +37,65 @@ void loadFeatureMatrix(const char* filename, std::vector<std::vector<float>>& fe
         std::vector<float> row;
         std::stringstream ss(line);
         std::string value;
+        bool has_nan = false;
 
         while (std::getline(ss, value, ',')) {
-            row.push_back(std::stof(value));
+            float num = std::stof(value);
+            if (std::isnan(num)) {
+                has_nan = true;
+                break;
+            }
+            row.push_back(num);
         }
 
-        featuresMatrix.push_back(row);
+        if (!has_nan) {
+            featuresMatrix.push_back(row);
+        }
     }
 }
 
-// Compute the covariance matrix using NPP
+// Compute the covariance matrix using NPP and a custom CUDA kernel.
+
+/*
+    Description:
+        This kernel manually computes the covariance matrix of a given feature matrix. 
+        The feature matrix is first centered by subtracting the mean of each feature, 
+        and then the covariance matrix is calculated.
+
+    Inputs:
+        float* d_centeredMatrix:
+            - A pointer to the centered feature matrix on the device (GPU).
+            - Each element is a floating-point value representing the deviation of a feature from its mean.
+
+        float* d_covarianceMatrix:
+            - A pointer to the covariance matrix on the device (GPU) where the computed covariance values will be stored.
+            - This matrix will be populated with the covariance values for each pair of features.
+
+        int num_samples:
+            - The number of samples in the dataset.
+            - This value determines how many data points are used in the covariance calculation.
+
+        int num_features:
+            - The number of features in the dataset.
+            - This value determines the dimensions of the covariance matrix.
+    
+    Outputs:
+        void, no return:
+            - The function directly modifies the provided covariance matrix on the device with computed values.
+*/
+__global__ void computeCovarianceKernel(float* d_centeredMatrix, float* d_covarianceMatrix, int num_samples, int num_features) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < num_features && col < num_features) {
+        float cov = 0.0f;
+        for (int i = 0; i < num_samples; ++i) {
+            cov += d_centeredMatrix[i * num_features + row] * d_centeredMatrix[i * num_features + col];
+        }
+        d_covarianceMatrix[row * num_features + col] = cov / (num_samples - 1);
+    }
+}
+
 /*
     Description:
         This function computes the covariance matrix of a given feature matrix. 
@@ -74,7 +122,7 @@ void loadFeatureMatrix(const char* filename, std::vector<std::vector<float>>& fe
 */
 void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatrix, std::vector<std::vector<float>>& covarianceMatrix) {
     int num_samples = featuresMatrix.size();
-    int num_features = featuresMatrix[0].size();
+    int num_features = NUM_FEATURES;
 
     // Center the feature matrix by subtracting the mean of each feature
     std::vector<float> means(num_features, 0.0f);
@@ -85,10 +133,10 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         means[j] /= num_samples;
     }
 
-    std::vector<std::vector<float>> centeredMatrix = featuresMatrix;
+    std::vector<std::vector<float>> centeredMatrix(num_samples, std::vector<float>(num_features));
     for (int j = 0; j < num_features; ++j) {
         for (int i = 0; i < num_samples; ++i) {
-            centeredMatrix[i][j] -= means[j];
+            centeredMatrix[i][j] = featuresMatrix[i][j] - means[j];
         }
     }
 
@@ -96,31 +144,61 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
     float* d_centeredMatrix;
     cudaError_t err = cudaMalloc((void**)&d_centeredMatrix, num_samples * num_features * sizeof(float));
     if (err != cudaSuccess) {
-        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        std::cerr << "CUDA malloc failed for d_centeredMatrix: " << cudaGetErrorString(err) << std::endl;
         return;
     }
-    cudaMemcpy(d_centeredMatrix, &centeredMatrix[0][0], num_samples * num_features * sizeof(float), cudaMemcpyHostToDevice);
-
-    float* d_covarianceMatrix;
-    cudaError_t err = cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
+    err = cudaMemcpy(d_centeredMatrix, centeredMatrix[0].data(), num_samples * num_features * sizeof(float), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
-        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        std::cerr << "CUDA memcpy failed for d_centeredMatrix: " << cudaGetErrorString(err) << std::endl;
         cudaFree(d_centeredMatrix);
         return;
     }
 
-    // NPP function to compute covariance matrix (this is a pseudocode placeholder)
-    // Replace with the appropriate NPP function if available
-    // nppiCovariance_32f(d_centeredMatrix, num_features, d_covarianceMatrix, num_samples, num_features);
+    float* d_covarianceMatrix;
+    err = cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_centeredMatrix);
+        return;
+    }
+
+    // Define grid and block sizes
+    dim3 blockSize(16, 16);
+    dim3 gridSize((num_features + blockSize.x - 1) / blockSize.x, (num_features + blockSize.y - 1) / blockSize.y);
+
+    // Launch kernel to compute covariance matrix
+    computeCovarianceKernel<<<gridSize, blockSize>>>(d_centeredMatrix, d_covarianceMatrix, num_samples, num_features);
+
+    // Check for kernel launch errors
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::cerr << "Kernel launch failed for computeCovarianceKernel: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_centeredMatrix);
+        cudaFree(d_covarianceMatrix);
+        return;
+    }
+
+    // Synchronize to ensure kernel execution is complete
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Device Synchronization failed after computeCovarianceKernel: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_centeredMatrix);
+        cudaFree(d_covarianceMatrix);
+        return;
+    }
 
     // Copy the covariance matrix back to the host
-    cudaMemcpy(&covarianceMatrix[0][0], d_covarianceMatrix, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(covarianceMatrix[0].data(), d_covarianceMatrix, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memcpy failed for covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
+    }
 
+    // Free device memory
     cudaFree(d_centeredMatrix);
     cudaFree(d_covarianceMatrix);
 }
 
-// Perform eigenvalue decomposition using NPP
+// Perform eigenvalue decomposition using cuSolver
 /*
     Description:
         This function performs eigenvalue decomposition on a covariance matrix.
@@ -154,39 +232,98 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
     float* d_covarianceMatrix;
     cudaError_t err = cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
     if (err != cudaSuccess) {
-        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        std::cerr << "CUDA malloc failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
         return;
     }
-    cudaMemcpy(d_covarianceMatrix, &covarianceMatrix[0][0], num_features * num_features * sizeof(float), cudaMemcpyHostToDevice);
-
-    float* d_eigenvalues;
-    float* d_eigenvectors;
-    cudaError_t err = cudaMalloc((void**)&d_eigenvalues, num_features * sizeof(float));
+    err = cudaMemcpy(d_covarianceMatrix, covarianceMatrix[0].data(), num_features * num_features * sizeof(float), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
-        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        std::cerr << "CUDA memcpy failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
         cudaFree(d_covarianceMatrix);
         return;
     }
-    cudaError_t err = cudaMalloc((void**)&d_eigenvectors, num_features * num_features * sizeof(float));
+
+    float* d_eigenvalues;
+    float* d_eigenvectors;
+    err = cudaMalloc((void**)&d_eigenvalues, num_features * sizeof(float));
     if (err != cudaSuccess) {
-        std::cerr << "CUDA malloc failed: " << cudaGetErrorString(err) << std::endl;
+        std::cerr << "CUDA malloc failed for d_eigenvalues: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_covarianceMatrix);
+        return;
+    }
+    err = cudaMalloc((void**)&d_eigenvectors, num_features * num_features * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for d_eigenvectors: " << cudaGetErrorString(err) << std::endl;
         cudaFree(d_covarianceMatrix);
         cudaFree(d_eigenvalues);
         return;
     }
 
-    // NPP function to compute eigenvalues and eigenvectors (pseudocode placeholder)
-    // nppiEigenValuesVectors_32f(d_covarianceMatrix, d_eigenvalues, d_eigenvectors, num_features);
+    cusolverDnHandle_t cusolverH = NULL;
+    cusolverStatus_t cusolver_status = cusolverDnCreate(&cusolverH);
+    if (cusolver_status != CUSOLVER_STATUS_SUCCESS) {
+        std::cerr << "CUSOLVER initialization failed" << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        cudaFree(d_eigenvectors);
+        return;
+    }
+
+    int work_size = 0;
+    int* devInfo = NULL;
+    err = cudaMalloc((void**)&devInfo, sizeof(int));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for devInfo: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        cudaFree(d_eigenvectors);
+        cusolverDnDestroy(cusolverH);
+        return;
+    }
+
+    // Allocate space for the workspace
+    cusolverDnSsyevd_bufferSize(cusolverH, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, num_features, d_covarianceMatrix, num_features, d_eigenvalues, &work_size);
+    float* work;
+    err = cudaMalloc((void**)&work, work_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for work: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        cudaFree(d_eigenvectors);
+        cusolverDnDestroy(cusolverH);
+        cudaFree(devInfo);
+        return;
+    }
+
+    // Perform the eigenvalue decomposition
+    cusolver_status = cusolverDnSsyevd(cusolverH, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_UPPER, num_features, d_covarianceMatrix, num_features, d_eigenvalues, work, work_size, devInfo);
+    if (cusolver_status != CUSOLVER_STATUS_SUCCESS) {
+        std::cerr << "Failed to perform eigenvalue decomposition" << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        cudaFree(d_eigenvectors);
+        cudaFree(work);
+        cudaFree(devInfo);
+        cusolverDnDestroy(cusolverH);
+        return;
+    }
 
     // Copy the results back to the host
-    cudaMemcpy(&eigenvalues[0], d_eigenvalues, num_features * sizeof(float), cudaMemcpyDeviceToHost);
-    cudaMemcpy(&eigenvectors[0][0], d_eigenvectors, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(eigenvalues.data(), d_eigenvalues, num_features * sizeof(float), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memcpy failed for d_eigenvalues: " << cudaGetErrorString(err) << std::endl;
+    }
+    err = cudaMemcpy(eigenvectors[0].data(), d_eigenvectors, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memcpy failed for d_eigenvectors: " << cudaGetErrorString(err) << std::endl;
+    }
 
     cudaFree(d_covarianceMatrix);
     cudaFree(d_eigenvalues);
     cudaFree(d_eigenvectors);
+    cudaFree(work);
+    cudaFree(devInfo);
+    cusolverDnDestroy(cusolverH);
 }
-
 // Project the data onto the principal components
 /*
     Description:
