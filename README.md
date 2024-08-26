@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project demonstrates the use of NVIDIA Performance Primitives (NPP) library with CUDA to perform image rotation. The goal is to utilize GPU acceleration to efficiently rotate a given image by a specified angle, leveraging the computational power of modern GPUs. The project is a part of the CUDA at Scale for the Enterprise course and serves as a template for understanding how to implement basic image processing operations using CUDA and NPP.
+This project demonstrates the use of NVIDIA Performance Primitives (NPP) library with CUDA and Aquila to perform signal processing on audio data for different musical instruments. The goal is to utilize GPU acceleration to efficiently rotate a given image by a specified angle, leveraging the computational power of modern GPUs. The project is a part of the CUDA at Scale for the Enterprise course and serves as a template for understanding how to implement basic image processing operations using CUDA and NPP.
 
 ## Code Organization
 
@@ -22,6 +22,8 @@ The source code is here, with programs split in a hierarchical fashion according
     - ```wav_loader.cu``` This file loads WAV files using the Aquila library, extracts the signal, and passes it to the feature_extraction function. The extracted features are stored in a matrix and written to a CSV.
     - ```feature_extraction.cu``` This file handles extracting various features from the WAV files, such as spectral centroid, flatness, bandwidth, zero-crossing rate (ZCR), energy, and temporal features using CUDA and NPP signal processing routines. Logic maps the filenames to instrument labels based on substrings, saving extracted and calculated features and corresponding instrument labels to another CSV.
     - ```pca.cu``` This file loads the feature matrix from the CSV file and uses NPP features to compute the covariance matrix, perform eigenvalue decomposition, and project the data onto the principal components. The results are then saved to a third CSV.
+- ```vis/```
+    - ```PCA_visualization.ipynb```
 
 
 ```README.md```
@@ -35,6 +37,9 @@ There should be some rudimentary scripts for building your project's code in an 
 
 ```run.sh```
 An optional script used to run your executable code, either with or without command-line arguments.
+
+```requirements.txt```
+A list of Python modules required by the visualization Jupyter Notebook in ```src/vis/PCA_visualization.ipynb```. Install with ```pip install -r requirements.txt```.
 
 ## Key Concepts
 
