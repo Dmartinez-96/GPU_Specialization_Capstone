@@ -190,17 +190,20 @@ void fft_feature_extraction(float* h_signal, int length, Features* h_features) {
     h_features->spectralBandwidth = (sum_magnitudes != 0) ? sqrtf(spectral_bandwidth / sum_magnitudes) : 0.0f;
 
     // Calculate spectral flatness
-    float geom_mean = 1.0f;
+    float geom_mean_log_sum = 0.0f;
+    int non_zero_count = 0;
     for (int i = 0; i < length; ++i) {
         if (h_features->magnitude[i] > 0) {
-            geom_mean *= h_features->magnitude[i];
+            geom_mean_log_sum += logf(h_features->magnitude[i]);
+            non_zero_count++;
         }
     }
-    geom_mean = powf(geom_mean, 1.0f / length);
+
+    float geom_mean = (non_zero_count > 0) ? expf(geom_mean_log_sum / non_zero_count) : 0.0f;
     
     float arithm_mean = (sum_magnitudes != 0) ? (sum_magnitudes / length) : 0.0f;
-    std::cout << "arithm_mean: " << arithm_mean << std::endl;
-    std::cout << "geom_mean: " << geom_mean << std::endl;
+    //std::cout << "arithm_mean: " << arithm_mean << std::endl;
+    //std::cout << "geom_mean: " << geom_mean << std::endl;
     h_features->spectralFlatness = (arithm_mean != 0) ? (geom_mean / arithm_mean) : 0.0f;
 
     // Using CUDA kernel, calculate ZCR

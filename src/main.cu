@@ -91,17 +91,23 @@ int main() {
         outFile << "," << labels[i] << "\n";
     }
     outFile.close();
-    
+    std::cout << "Completed features_with_labels.csv!" << std::endl;
     // Perform PCA
     std::vector<std::vector<float>> covarianceMatrix(NUM_FEATURES, std::vector<float>(NUM_FEATURES, 0));
     computeCovarianceMatrix(featuresMatrix, covarianceMatrix);
+    
+    std::cout << "Completed computeCovarianceMatrix!" << std::endl;
 
     std::vector<float> eigenvalues(NUM_FEATURES, 0);
     std::vector<std::vector<float>> eigenvectors(NUM_FEATURES, std::vector<float>(NUM_FEATURES, 0));
     performEigenDecomposition(covarianceMatrix, eigenvalues, eigenvectors);
+    
+    std::cout << "Completed performEigenDecomposition!" << std::endl;
 
     std::vector<std::vector<float>> pca_result(featuresMatrix.size(), std::vector<float>(NUM_FEATURES));
     projectOntoPrincipalComponents(featuresMatrix, eigenvectors, pca_result);
+    
+    std::cout << "Completed projectOntoPrincipalComponents!" << std::endl;
 
     // Write PCA results to a CSV file
     std::ofstream pcaFile("pca_results.csv");
