@@ -161,15 +161,6 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         }
     }
 
-    // Debug: Print centered features to check for anomalies
-    std::cout << "Centered Matrix before scaling:" << std::endl;
-    for (int i = 0; i < num_samples; ++i) {
-        for (int j = 0; j < num_features; ++j) {
-            std::cout << centeredMatrix[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-
     // Scale the centered data to prevent overflow
     for (int j = 0; j < num_features; ++j) {
         auto max_iter = std::max_element(centeredMatrix.begin(), centeredMatrix.end(),
@@ -184,13 +175,12 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         }
     }
 
-    // Debug: Print scaled centered features to check for anomalies
-    std::cout << "Centered Matrix after scaling:" << std::endl;
+    // Flatten the centeredMatrix into a single array for NPP
+    std::vector<float> h_centeredMatrix(num_samples * num_features);
     for (int i = 0; i < num_samples; ++i) {
         for (int j = 0; j < num_features; ++j) {
-            std::cout << centeredMatrix[i][j] << " ";
+            h_centeredMatrix[i * num_features + j] = centeredMatrix[i][j];
         }
-        std::cout << std::endl;
     }
 
     // Convert centeredMatrix to a single array for NPP
@@ -200,7 +190,8 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         std::cerr << "CUDA malloc failed for d_centeredMatrix: " << cudaGetErrorString(err) << std::endl;
         return;
     }
-    err = cudaMemcpy(d_centeredMatrix, centeredMatrix[0].data(), num_samples * num_features * sizeof(float), cudaMemcpyHostToDevice);
+    // Copy the flattened array to the device
+    err = cudaMemcpy(d_centeredMatrix, h_centeredMatrix.data(), num_samples * num_features * sizeof(float), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed for d_centeredMatrix: " << cudaGetErrorString(err) << std::endl;
         cudaFree(d_centeredMatrix);
@@ -313,14 +304,6 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
         std::cerr << "CUDA memcpy failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
         cudaFree(d_covarianceMatrix);
         return;
-    }
-
-    std::cout << "Covariance Matrix:" << std::endl;
-    for (int i = 0; i < num_features; ++i) {
-        for (int j = 0; j < num_features; ++j) {
-            std::cout << covarianceMatrix[i][j] << " ";
-        }
-        std::cout << std::endl;
     }
 
     // Allocate memory for eigenvalues and eigenvectors
