@@ -87,6 +87,8 @@ int main() {
         std::cout << "Completed processing file: " << file << "      (" << progCounter << "/14 done)" << std::endl;
     }
 
+    std::vector<std::vector<float>> originalFeaturesMatrix;
+
     // Optionally write the features and labels to a CSV file
     std::ofstream outFile("results/features_with_labels.csv");
     
@@ -101,13 +103,42 @@ int main() {
     std::cout << "Wrote signal features to results/features_with_labels.csv!" << std::endl;
 
     // Load featuresMatrix from the CSV file
+    //std::vector<std::vector<float>> featuresMatrix;
     std::cout << "Loading features from CSV file." << std::endl;
-    loadFeatureMatrix("results/features_with_labels.csv", featuresMatrix);
+    loadFeatureMatrix("results/features_with_labels.csv", originalFeaturesMatrix);
     std::cout << "Completed loading features from CSV!" << std::endl;
+
+    // std::cout << "Comparing original and loaded matrices:" << std::endl;
+    // for (size_t i = 0; i < featuresMatrix.size(); ++i) {
+    //     for (size_t j = 0; j < featuresMatrix[i].size(); ++j) {
+    //         if (featuresMatrix[i][j] != originalFeaturesMatrix[i][j]) {
+    //             std::cout << "Difference found at [" << i << "][" << j << "]: "
+    //                     << "Original: " << originalFeaturesMatrix[i][j] << " "
+    //                     << "Loaded: " << featuresMatrix[i][j] << std::endl;
+    //         }
+    //     }
+    // }
+
+    // // Debugging print statement to check the loaded feature matrix
+    // std::cout << "Features Matrix loaded:" << std::endl;
+    // for (const auto& row : featuresMatrix) {
+    //     for (const auto& val : row) {
+    //         std::cout << val << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+
+    // std::cout << "CSV Features Matrix loaded:" << std::endl;
+    // for (const auto& row : originalFeaturesMatrix) {
+    //     for (const auto& val : row) {
+    //         std::cout << val << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
 
     // Perform PCA
     std::vector<std::vector<float>> covarianceMatrix(NUM_FEATURES, std::vector<float>(NUM_FEATURES, 0));
-    computeCovarianceMatrix(featuresMatrix, covarianceMatrix);
+    computeCovarianceMatrix(originalFeaturesMatrix, covarianceMatrix);
     
     std::cout << "Computed Covariance Matrix!" << std::endl;
 
@@ -122,7 +153,7 @@ int main() {
     int eigenvalueCounter = 0;
     for (const auto& value : eigenvalues) {
         eigenvaluesFile << value;
-        if (eigenvalueCounter < 7) {
+        if (eigenvalueCounter <= 7) {
             eigenvaluesFile << ",";
         }
         eigenvalueCounter++;
@@ -130,8 +161,8 @@ int main() {
     eigenvaluesFile.close();
     std::cout << "Eigenvalues saved to results/eigenvalues.csv" << std::endl;
 
-    std::vector<std::vector<float>> pca_result(featuresMatrix.size(), std::vector<float>(NUM_FEATURES));
-    projectOntoPrincipalComponents(featuresMatrix, eigenvectors, pca_result);
+    std::vector<std::vector<float>> pca_result(originalFeaturesMatrix.size(), std::vector<float>(NUM_FEATURES));
+    projectOntoPrincipalComponents(originalFeaturesMatrix, eigenvectors, pca_result);
     
     std::cout << "Projected data onto principal components!" << std::endl;
 

@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <cuda_runtime.h>
+#include <algorithm>
+#include <cmath>
 #include <npp.h>
 #include <cusolverDn.h>
 #include "../../include/pca.h"
@@ -159,6 +161,38 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         }
     }
 
+    // Debug: Print centered features to check for anomalies
+    std::cout << "Centered Matrix before scaling:" << std::endl;
+    for (int i = 0; i < num_samples; ++i) {
+        for (int j = 0; j < num_features; ++j) {
+            std::cout << centeredMatrix[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    // Scale the centered data to prevent overflow
+    for (int j = 0; j < num_features; ++j) {
+        auto max_iter = std::max_element(centeredMatrix.begin(), centeredMatrix.end(),
+                                          [j](const std::vector<float>& a, const std::vector<float>& b) {
+                                              return std::fabs(a[j]) < std::fabs(b[j]);
+                                          });
+        float max_val = std::fabs((*max_iter)[j]);
+        if (max_val != 0) { // Avoid division by zero
+            for (int i = 0; i < num_samples; ++i) {
+                centeredMatrix[i][j] /= max_val;
+            }
+        }
+    }
+
+    // Debug: Print scaled centered features to check for anomalies
+    std::cout << "Centered Matrix after scaling:" << std::endl;
+    for (int i = 0; i < num_samples; ++i) {
+        for (int j = 0; j < num_features; ++j) {
+            std::cout << centeredMatrix[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+
     // Convert centeredMatrix to a single array for NPP
     float* d_centeredMatrix = nullptr;
     cudaError_t err = cudaMalloc((void**)&d_centeredMatrix, num_samples * num_features * sizeof(float));
@@ -279,6 +313,14 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
         std::cerr << "CUDA memcpy failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
         cudaFree(d_covarianceMatrix);
         return;
+    }
+
+    std::cout << "Covariance Matrix:" << std::endl;
+    for (int i = 0; i < num_features; ++i) {
+        for (int j = 0; j < num_features; ++j) {
+            std::cout << covarianceMatrix[i][j] << " ";
+        }
+        std::cout << std::endl;
     }
 
     // Allocate memory for eigenvalues and eigenvectors
