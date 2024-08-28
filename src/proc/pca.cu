@@ -38,15 +38,29 @@ void loadFeatureMatrix(const char* filename, std::vector<std::vector<float>>& fe
         std::vector<float> row;
         std::stringstream ss(line);
         std::string value;
+        int colIndex = 0;
         bool has_nan = false;
 
+        // Parse all columns except the last one (which is the label)
         while (std::getline(ss, value, ',')) {
-            float num = std::stof(value);
-            if (std::isnan(num)) {
-                has_nan = true;
+            colIndex++;
+            if (colIndex < 10) { // Assuming there are 9 numeric columns followed by the label
+                try {
+                    float num = std::stof(value);
+                    if (std::isnan(num)) {
+                        has_nan = true;
+                        break;
+                    }
+                    row.push_back(num);
+                } catch (const std::invalid_argument& e) {
+                    std::cerr << "Invalid data encountered: " << value << std::endl;
+                    has_nan = true;
+                    break;
+                }
+            } else {
+                // Skip the label
                 break;
             }
-            row.push_back(num);
         }
 
         if (!has_nan) {
@@ -95,8 +109,13 @@ __global__ void computeCovarianceKernel(float* d_centeredMatrix, float* d_covari
             cov += d_centeredMatrix[i * num_features + row] * d_centeredMatrix[i * num_features + col];
         }
         d_covarianceMatrix[row * num_features + col] = cov / (num_samples - 1);
+        
+        // Debug print to verify every element calculation
+        printf("Thread [%d,%d] computed cov[%d][%d] = %f and stored at %d\n", 
+               row, col, row, col, cov / (num_samples - 1), row * num_features + col);
     }
 }
+
 
 /*
     Description:
@@ -143,8 +162,10 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         }
     }
 
+    std::cout << "Centered matrix calculated." << std::endl;
+
     // Convert centeredMatrix to a single array for NPP
-    float* d_centeredMatrix;
+    float* d_centeredMatrix = nullptr;
     cudaError_t err = cudaMalloc((void**)&d_centeredMatrix, num_samples * num_features * sizeof(float));
     if (err != cudaSuccess) {
         std::cerr << "CUDA malloc failed for d_centeredMatrix: " << cudaGetErrorString(err) << std::endl;
@@ -157,7 +178,9 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         return;
     }
 
-    float* d_covarianceMatrix;
+    std::cout << "Centered matrix copied to device." << std::endl;
+
+    float* d_covarianceMatrix = nullptr;
     err = cudaMalloc((void**)&d_covarianceMatrix, num_features * num_features * sizeof(float));
     if (err != cudaSuccess) {
         std::cerr << "CUDA malloc failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
@@ -165,9 +188,12 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         return;
     }
 
+    std::cout << "Covariance matrix memory allocated on device." << std::endl;
+
     // Define grid and block sizes
     dim3 blockSize(16, 16);
     dim3 gridSize((num_features + blockSize.x - 1) / blockSize.x, (num_features + blockSize.y - 1) / blockSize.y);
+    std::cout << "Launching kernel with gridSize: " << gridSize.x << ", " << gridSize.y << std::endl;
 
     // Launch kernel to compute covariance matrix
     computeCovarianceKernel<<<gridSize, blockSize>>>(d_centeredMatrix, d_covarianceMatrix, num_samples, num_features);
@@ -181,6 +207,8 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         return;
     }
 
+    std::cout << "Kernel launched successfully." << std::endl;
+
     // Synchronize to ensure kernel execution is complete
     err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
@@ -190,10 +218,30 @@ void computeCovarianceMatrix(const std::vector<std::vector<float>>& featuresMatr
         return;
     }
 
+    std::cout << "Kernel execution completed." << std::endl;
+
     // Copy the covariance matrix back to the host
-    err = cudaMemcpy(covarianceMatrix[0].data(), d_covarianceMatrix, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
+    std::vector<float> h_covarianceMatrix(num_features * num_features);
+    err = cudaMemcpy(h_covarianceMatrix.data(), d_covarianceMatrix, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed for covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_centeredMatrix);
+        cudaFree(d_covarianceMatrix);
+        return;
+    }
+
+    // Transfer data from the 1D vector to the 2D covarianceMatrix
+    for (int i = 0; i < num_features; ++i) {
+        for (int j = 0; j < num_features; ++j) {
+            covarianceMatrix[i][j] = h_covarianceMatrix[i * num_features + j];
+        }
+    }
+
+    // Debug: print the elements of the covariance matrix
+    for (int i = 0; i < covarianceMatrix.size(); ++i) {
+        for (int j = 0; j < covarianceMatrix[i].size(); ++j) {
+            std::cout << "covarianceMatrix[" << i << "][" << j << "] = " << covarianceMatrix[i][j] << std::endl;
+        }
     }
 
     // Free device memory
@@ -327,6 +375,20 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
         return;
     }
 
+    // Check devInfo value
+    int devInfo_h = 0;
+    cudaMemcpy(&devInfo_h, devInfo, sizeof(int), cudaMemcpyDeviceToHost);
+    if (devInfo_h != 0) {
+        std::cerr << "Eigenvalue decomposition failed, devInfo: " << devInfo_h << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        cudaFree(d_eigenvectors);
+        cudaFree(work);
+        cudaFree(devInfo);
+        cusolverDnDestroy(cusolverH);
+        return;
+    }
+
     std::cout << "Eigenvalue decomposition completed." << std::endl;
 
     // Copy the results back to the host
@@ -337,6 +399,11 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
     err = cudaMemcpy(eigenvectors[0].data(), d_eigenvectors, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed for d_eigenvectors: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    // Debug: print the first few eigenvectors
+    for (int i = 0; i < num_features; ++i) {
+        std::cout << "eigenvectors[0][" << i << "] = " << eigenvectors[0][i] << std::endl;
     }
 
     
@@ -389,6 +456,7 @@ void projectOntoPrincipalComponents(const std::vector<std::vector<float>>& featu
             for (int k = 0; k < num_components; ++k) {
                 pca_result[i][j] += featuresMatrix[i][k] * eigenvectors[k][j];
             }
+            std::cout << "pca_result[" << i << "][" << j << "] = " << pca_result[i][j] << std::endl;
         }
     }
     std::cout << "Finishing projectOntoPrincipalComponents in pca.cu." << std::endl;
