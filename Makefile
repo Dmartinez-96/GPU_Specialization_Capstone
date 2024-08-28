@@ -62,8 +62,7 @@ run: $(TARGET)
 
 # Clean up
 clean:
-	rm -rf $(BIN_DIR)/*
-# *.csv || true
+	rm -rf $(BIN_DIR)/* results/eigenvalues.csv results/features_with_labels.csv results/pca_results.csv || true
 
 # Installation rule (not much to install, but here for completeness)
 install:
