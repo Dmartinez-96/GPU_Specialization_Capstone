@@ -38,7 +38,6 @@ LDFLAGS = -L/usr/local/cuda/lib64 -L/usr/local/lib -lcudart -lnppc -lnppicc -lnp
 # Define directories
 SRC_DIR = src
 PROC_DIR = $(SRC_DIR)/proc
-VIS_DIR = $(SRC_DIR)/vis
 BIN_DIR = bin
 DATA_DIR = data
 LIB_DIR = lib
