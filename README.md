@@ -94,27 +94,32 @@ $ cd <project_dir>
 $ make
 ```
 
+The results should look similar to the image below:
+
+![image](https://github.com/user-attachments/assets/f8d7e93f-9f51-4eff-8a5f-667085b83eae)
+
 ## Running the Program
-After building the project, you can run the program using the following command:
+After building the project, you can run the program using the following commands. This command will execute the compiled binary, saving three CSV files with signal features, covariance matrix eigenvalues, and its projection onto the principal components. The results can then be run in the Jupyter Notebook:
 
 __Linux__:
 
 ```bash
-./bin/PCA_Instrument
+./bin/PCA_Instrument.exe
 ```
 __Windows__:
-
-This command will execute the compiled binary, rotating the input image (Lena.png) by 45 degrees, and save the result as Lena_rotated.png in the data/ directory.
-
-If you wish to run the binary directly with custom input/output files, you can use:
 
 ```bash
 .\bin\PCA_Instrument.exe
 ```
 
+Various progress statements will be printed to the terminal as the program proceeds.
+
+The result should look similar to the image below:
+
+![image](https://github.com/user-attachments/assets/468d00e9-34e4-4286-a6d1-c758003a0807)
+
 - Cleaning Up
 To clean up the compiled binaries and other generated files, run:
-
 
 ```bash
 - Copy code
