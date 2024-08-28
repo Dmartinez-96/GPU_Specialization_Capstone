@@ -132,14 +132,14 @@ This will remove all files in the ```bin/``` directory and all generated CSV fil
 
 After successfully running, the results may be visualized using the Jupyter Notebook in ```src/vis/```, which has three sections. We can do the following.
 
-### Visualize the original signal features with labels
+### Visualize the original signal features with labels.
 
 ![signal_feature_pair_plots](https://github.com/user-attachments/assets/099ebe87-d148-4ecc-9f6e-73e69fb6cf21)
 
-### Plot eigenvalues in a scree plot to explain variance by each principal component
+### Plot eigenvalues in a scree plot to explain variance by each principal component.
 
 ![scree_plot](https://github.com/user-attachments/assets/62f42d34-215d-486b-8131-94baebc9f7b9)
 
-### Plot all principal components against one another in pairs by instrument.
+### Plot all principal components against one another in pairs by instrument..
 
 ![principal_component_pair_plots](https://github.com/user-attachments/assets/36e3f07e-80ab-4f57-8cfc-acce79c6784e)
