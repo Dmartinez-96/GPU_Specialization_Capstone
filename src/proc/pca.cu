@@ -289,7 +289,15 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
         std::cerr << "CUDA malloc failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
         return;
     }
-    err = cudaMemcpy(d_covarianceMatrix, covarianceMatrix[0].data(), num_features * num_features * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Flatten the host covariance matrix into a contiguous block of memory
+    std::vector<float> h_covarianceMatrix(num_features * num_features);
+    for (int i = 0; i < num_features; ++i) {
+        std::copy(covarianceMatrix[i].begin(), covarianceMatrix[i].end(), h_covarianceMatrix.begin() + i * num_features);
+    }
+
+    // Copy the flattened covariance matrix to the device
+    err = cudaMemcpy(d_covarianceMatrix, h_covarianceMatrix.data(), num_features * num_features * sizeof(float), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed for d_covarianceMatrix: " << cudaGetErrorString(err) << std::endl;
         cudaFree(d_covarianceMatrix);
@@ -324,7 +332,7 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
         return;
     }
 
-    // Allocate memory for solver stuff
+    // Allocate space for solver workspace
     int work_size = 0;
     int* devInfo = NULL;
     err = cudaMalloc((void**)&devInfo, sizeof(int));
@@ -349,6 +357,7 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
         return;
     }
     std::cout << "Buffer size for eigenvalue decomposition: " << work_size << std::endl;
+
     float* work = nullptr;
     err = cudaMalloc((void**)&work, work_size * sizeof(float));
     if (err != cudaSuccess) {
@@ -395,15 +404,40 @@ void performEigenDecomposition(const std::vector<std::vector<float>>& covariance
     err = cudaMemcpy(eigenvalues.data(), d_eigenvalues, num_features * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed for d_eigenvalues: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        cudaFree(d_eigenvectors);
+        cudaFree(work);
+        cudaFree(devInfo);
+        cusolverDnDestroy(cusolverH);
+        return;
     }
-    err = cudaMemcpy(eigenvectors[0].data(), d_eigenvectors, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
+
+    std::vector<float> h_eigenvectors(num_features * num_features);
+    err = cudaMemcpy(h_eigenvectors.data(), d_eigenvectors, num_features * num_features * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed for d_eigenvectors: " << cudaGetErrorString(err) << std::endl;
+        cudaFree(d_covarianceMatrix);
+        cudaFree(d_eigenvalues);
+        cudaFree(d_eigenvectors);
+        cudaFree(work);
+        cudaFree(devInfo);
+        cusolverDnDestroy(cusolverH);
+        return;
+    }
+
+    // Transfer data from the 1D vector to the 2D eigenvectors matrix
+    for (int i = 0; i < num_features; ++i) {
+        for (int j = 0; j < num_features; ++j) {
+            eigenvectors[i][j] = h_eigenvectors[i * num_features + j];
+        }
     }
 
     // Debug: print the first few eigenvectors
     for (int i = 0; i < num_features; ++i) {
-        std::cout << "eigenvectors[0][" << i << "] = " << eigenvectors[0][i] << std::endl;
+        for (int j = 0; j < num_features; ++j) {
+            std::cout << "eigenvectors[" << i << "][" << j << "] = " << eigenvectors[i][j] << std::endl;
+        }
     }
 
     
