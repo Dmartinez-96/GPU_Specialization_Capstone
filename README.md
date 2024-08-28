@@ -2,44 +2,34 @@
 
 ## Overview
 
-This project demonstrates the use of NVIDIA Performance Primitives (NPP) library with CUDA and Aquila to perform signal processing on audio data for different musical instruments. The goal is to utilize GPU acceleration to efficiently rotate a given image by a specified angle, leveraging the computational power of modern GPUs. The project is a part of the CUDA at Scale for the Enterprise course and serves as a template for understanding how to implement basic image processing operations using CUDA and NPP.
+This project demonstrates the use of NVIDIA Performance Primitives (NPP) library with CUDA and Aquila to perform signal processing on audio data for different musical instruments. The goal is to utilize GPU acceleration to efficiently analyze several .WAV files of instrumental audio and extract audio features, then perform Principal Component Analysis on these features, leveraging the computational power of modern GPUs. The project is a part of the CUDA at Scale for the Enterprise course and serves to demonstrate my ability to utilize CUDA, NPP, and other functionalities to perform signal processing.
 
 ## Code Organization
 
-```bin/```
-This folder should hold all binary/executable code that is built automatically or manually. Executable code should have use the .exe extension or programming language-specific extension.
+- ```bin/``` This folder holds the binary/executable code that is built automatically or manually by the make commands.
 
-```data/```
-This folder holds the example WAV files used as data in the computational steps for Principal Component Analysis.
+- ```data/``` This folder holds the example WAV files used as data in the computational steps for signal processing and Principal Component Analysis.
+    - ```data/WAV_files``` This subfolder holds the WAV files for 14 instruments used in the main program.
+    - ```data/Extra_WAV_files``` Extra WAV files for various instruments if the user is interested in doing further analysis.
 
-```lib/```
-Any libraries that are not installed via the Operating System-specific package manager should be placed here, so that it is easier for inclusion/linking.
+- ```lib/``` This folder is here if anyone wants to add more libraries to link, but all others can be installed via the operating-system specific package manager as in the instructions in ```INSTALL``` below.
 
-```src/```
-The source code is here, with programs split in a hierarchical fashion according to function.
-
-- ```proc/``` This subdirectory contains the .cu files that perform processing on the signal data.
-    - ```wav_loader.cu``` This file loads WAV files using the Aquila library, extracts the signal, and passes it to the feature_extraction function. The extracted features are stored in a matrix and written to a CSV.
-    - ```feature_extraction.cu``` This file handles extracting various features from the WAV files, such as spectral centroid, flatness, bandwidth, zero-crossing rate (ZCR), energy, and temporal features using CUDA and NPP signal processing routines. Logic maps the filenames to instrument labels based on substrings, saving extracted and calculated features and corresponding instrument labels to another CSV.
-    - ```pca.cu``` This file loads the feature matrix from the CSV file and uses NPP features to compute the covariance matrix, perform eigenvalue decomposition, and project the data onto the principal components. The results are then saved to a third CSV.
-- ```vis/```
-    - ```PCA_visualization.ipynb```
+- ```src/``` The source code is here, with programs split in a hierarchical fashion according to function.
+    - ```src/proc/``` This subdirectory contains the .cu files that perform processing on the signal data.
+        - ```src/proc/wav_loader.cu``` This file loads WAV files using the Aquila library, extracts the signal, and helps to pass it to the feature_extraction function.
+        - ```src/proc/feature_extraction.cu``` This file handles extracting various features from the WAV files, such as spectral centroid, flatness, bandwidth, zero-crossing rate (ZCR), energy, and temporal features using CUDA and NPP signal processing routines. Logic maps the filenames to instrument labels based on substrings, saving extracted and calculated features and corresponding instrument labels to a CSV.
+        - ```pca.cu``` This file loads the feature matrix from the CSV file and uses NPP features to compute the covariance matrix, perform eigenvalue decomposition, and project the data onto the principal components. The eigenvalue results are saved to a second CSV and the PCA results are then saved to a third CSV.
+    - ```src/vis/```
+        - ```src/vis/VisualizeResults.ipynb``` This Jupyter Notebook visualizes the features extracted by ```feature_extraction.cu``` and the PCA data from ```pca.cu```.
 
 
-```README.md```
-This file should hold the description of the project so that anyone cloning or deciding if they want to clone this repository can understand its purpose to help with their decision.
+- ```README.md``` This file is what you are reading now -- it gives descriptions of how the program runs and instructions.
 
-```INSTALL```
-This file should hold the human-readable set of instructions for installing the code so that it can be executed. If possible it should be organized around different operating systems, so that it can be done by as many people as possible with different constraints.
+- ```INSTALL``` This file holds a human-readable set of instructions for installing the code so that it can be executed on various operating systems, like Windows, Linux (Ubuntu), and MacOS. Extensive testing has been performed on Linux (Ubuntu). 
 
-```Makefile or CMAkeLists.txt or build.sh```
-There should be some rudimentary scripts for building your project's code in an automatic fashion.
+- ```Makefile``` This is a script to compile the executable program into the ```bin/``` directory. Current compiler flags are set with ```NVCCFLAGS = -arch=sm_75```, which may need to be adjusted for other architectures.
 
-```run.sh```
-An optional script used to run your executable code, either with or without command-line arguments.
-
-```requirements.txt```
-A list of Python modules required by the visualization Jupyter Notebook in ```src/vis/PCA_visualization.ipynb```. Install with ```pip install -r requirements.txt```.
+- ```requirements.txt``` A list of Python modules required by the visualization Jupyter Notebook in ```src/vis/PCA_visualization.ipynb```. Install with ```pip install -r requirements.txt```.
 
 ## Key Concepts
 
