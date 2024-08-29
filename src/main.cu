@@ -26,7 +26,7 @@ int main() {
                 fileToInstrumentMap[filePath] = "violin";
             } else if (lowerFilePath.find("cello") != std::string::npos) {
                 fileToInstrumentMap[filePath] = "cello";
-            } else if (lowerFilePath.find("harpsichord") != std::string::npos || lowerFilePath.find("harpsi") != std::string::npos) {
+            } else if (lowerFilePath.find("harpsi") != std::string::npos) {
                 fileToInstrumentMap[filePath] = "harpsichord";
             } else if (lowerFilePath.find("gongs") != std::string::npos) {
                 fileToInstrumentMap[filePath] = "gongs";
@@ -48,7 +48,9 @@ int main() {
                 fileToInstrumentMap[filePath] = "trumpet";
             } else if (lowerFilePath.find("viola") != std::string::npos) {
                 fileToInstrumentMap[filePath] = "viola";
-            }
+            } else if (lowerFilePath.find("gongs") != std::string::npos) {
+                fileToInstrumentMap[filePath] = "gongs";
+            } 
         }
     }
 
