@@ -122,7 +122,6 @@ The result should look similar to the image below:
 To clean up the compiled binaries and other generated files, run:
 
 ```bash
-- Copy code
 make clean
 ```
 
