@@ -1,5 +1,9 @@
 For installation, the dependencies can be obtained as follows.
 
+Python dependencies can be installed via:
+    cd <path/to/project/folder>
+    pip install -r requirements.txt
+
 For Ubuntu/Debian:
     sudo apt-get update
     sudo apt-get install cmake g++ libfftw3-dev libsndfile1-dev
@@ -46,7 +50,6 @@ For macOS (using Homebrew):
         cmake -DCMAKE_INSTALL_PREFIX=/path/to/your/project/ ..
         make
         make install
-
 
 For Windows:
     git clone https://github.com/microsoft/vcpkg.git

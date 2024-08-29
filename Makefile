@@ -56,12 +56,12 @@ $(TARGET): $(PROC_SRC) $(MAIN_SRC)
 	$(NVCC) $(CXXFLAGS) $(NVCCFLAGS) $(PROC_SRC) $(MAIN_SRC) -o $(TARGET) $(LDFLAGS)
 
 # Rule for running the application
-run: $(TARGET)
-	./$(TARGET) --input $(DATA_DIR)/WAV_files --output $(DATA_DIR)/pca_result.txt
+run:
+	python src/proc/librosa_extract.py; ./$(TARGET)
 
 # Clean up
 clean:
-	rm -rf $(BIN_DIR)/* results/eigenvalues.csv results/features_with_labels.csv results/pca_results.csv || true
+	rm -rf $(BIN_DIR)/* results/librosa_features.csv results/eigenvalues.csv results/features_with_labels.csv results/pca_results.csv || true
 
 # Installation rule (not much to install, but here for completeness)
 install:

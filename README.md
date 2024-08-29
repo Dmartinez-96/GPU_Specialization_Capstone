@@ -10,7 +10,6 @@ This project demonstrates the use of NVIDIA Performance Primitives (NPP) library
 
 - ```data/``` This folder holds the example WAV files used as data in the computational steps for signal processing and Principal Component Analysis.
     - ```data/WAV_files``` This subfolder holds the WAV files for 14 instruments used in the main program.
-    - ```data/Extra_WAV_files``` Extra WAV files for various instruments if the user is interested in doing further analysis.
 
 - ```lib/``` This folder is here if anyone wants to add more libraries to link, but all others can be installed via the operating-system specific package manager as in the instructions in ```INSTALL``` below.
 
